@@ -1,0 +1,388 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>IP Manager</title>
+    <style>
+        body {
+            display: flex;
+            margin: 0;
+            font-family: 'Segoe UI', sans-serif;
+            height: 100vh;
+            background: #f0f2f5;
+        }
+
+        #sidebar {
+            width: 220px;
+            background: #1a252f;
+            color: white;
+            padding: 20px;
+            flex-shrink: 0;
+        }
+
+            #sidebar h3 {
+                color: #1abc9c;
+                margin-bottom: 25px;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+            }
+
+            #sidebar button {
+                display: block;
+                width: 100%;
+                padding: 12px;
+                margin-bottom: 10px;
+                background: #2c3e50;
+                border: none;
+                color: white;
+                text-align: left;
+                cursor: pointer;
+                border-radius: 6px;
+                transition: 0.2s;
+            }
+
+                #sidebar button:hover {
+                    background: #34495e;
+                    border-left: 4px solid #1abc9c;
+                }
+
+        #content {
+            flex-grow: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .card {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+        }
+
+        .toolbar {
+            margin-bottom: 20px;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+
+        th, td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+
+        th {
+            background: #f8f9fa;
+            color: #7f8c8d;
+        }
+
+        .clickable-row:hover {
+            background-color: #f9f9f9;
+            cursor: pointer;
+        }
+
+        .btn-icon {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            padding: 4px;
+        }
+
+            .btn-icon:hover {
+                color: #e74c3c;
+            }
+
+        .btn {
+            padding: 8px 15px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+
+        .btn-primary {
+            background: #1abc9c;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+            font-size: 11px;
+            padding: 4px 8px;
+        }
+
+        .btn-tab {
+            background: #ecf0f1;
+            color: #7f8c8d;
+        }
+
+            .btn-tab.active {
+                background: #3498db;
+                color: white;
+            }
+
+        .btn-back {
+            background: #95a5a6;
+            color: white;
+            margin-left: auto;
+        }
+
+        .badge {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+
+        .bg-black {
+            background: #2c3e50;
+            color: white;
+        }
+
+        .bg-green {
+            background: #27ae60;
+            color: white;
+        }
+
+        .loading {
+            color: #3498db;
+            font-weight: bold;
+            padding: 10px;
+        }
+
+        .group-details {
+            background: #fdfdfd;
+            padding: 15px;
+            border-left: 3px solid #3498db;
+            margin: 5px 0;
+        }
+
+        ul {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        li {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 5px 0;
+            border-bottom: 1px dashed #eee;
+        }
+    </style>
+</head>
+<body>
+    <div id="sidebar">
+        <h3>IP Manager</h3>
+        <button onclick="changePage('asn')">📡 ASN Реестр</button>
+        <button onclick="changePage('ip')">📄 Списки IP</button>
+    </div>
+
+    <div id="content">
+        <div class="card">
+            <h2 id="page-title">Загрузка...</h2>
+            <div id="toolbar-container" class="toolbar"></div>
+            <div id="table-container">Выберите раздел в меню.</div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 'asn';
+        let currentListId = null;
+        let activeDetailsTab = 'no_asn';
+
+        window.onload = () => changePage('asn');
+
+        function sendMessage(cmd, data = {}) {
+            window.external.sendMessage(JSON.stringify({ command: cmd, ...data }));
+        }
+
+        function changePage(page) {
+            currentPage = page;
+            currentListId = null;
+            document.getElementById('page-title').innerText = page === 'asn' ? 'Реестр Автономных Систем' : 'Обработанные списки IP';
+            renderToolbar();
+            sendMessage('GET_DATA', { page: page });
+        }
+
+        function renderToolbar() {
+            const container = document.getElementById('toolbar-container');
+            container.innerHTML = '';
+            if (currentPage === 'asn') {
+                container.innerHTML = `<button class="btn btn-primary" onclick="addAsn()">+ Добавить ASN</button>`;
+            } else if (currentPage === 'ip') {
+                container.innerHTML = `<button class="btn btn-primary" onclick="selectFile()">+ Загрузить .TXT файл</button>`;
+            } else if (currentPage === 'details') {
+                container.innerHTML = `
+                        <button class="btn btn-tab ${activeDetailsTab === 'no_asn' ? 'active' : ''}" onclick="switchDetailsTab('no_asn')">Без ASN</button>
+                        <button class="btn btn-tab ${activeDetailsTab === 'with_asn' ? 'active' : ''}" onclick="switchDetailsTab('with_asn')">С найденными ASN</button>
+                        <button class="btn btn-back" onclick="changePage('ip')">← Назад</button>`;
+            } else if (currentPage === 'asn_ranges') {
+                container.innerHTML = `<button class="btn btn-back" onclick="changePage('asn')">← К реестру ASN</button>`;
+            }
+        }
+
+        function switchDetailsTab(tab) {
+            activeDetailsTab = tab;
+            renderToolbar();
+            document.getElementById('table-container').innerHTML = '<p class="loading">Загрузка данных...</p>';
+            const cmd = tab === 'no_asn' ? 'GET_NO_ASN' : 'GET_WITH_ASN';
+            sendMessage(cmd, { id: currentListId });
+        }
+
+        window.external.receiveMessage(message => {
+            const res = JSON.parse(message);
+            if (res.error) { alert("Ошибка: " + res.error); return; }
+            if (res.message) { console.log("System:", res.message); }
+
+            if (res.command === 'RENDER_GROUP_IPS') {
+                renderGroupIps(res.prefix, res.data);
+            } else if (res.command === 'REFRESH_AFTER_FIND') {
+                switchDetailsTab(activeDetailsTab);
+            } else if (res.command === 'FILE_SELECTED') {
+                if (confirm(`Загрузить файл: ${res.path}?`)) {
+                    sendMessage('UPLOAD_IP', { value: res.path });
+                }
+            } else if (res.page === 'asn') {
+                renderAsnTable(res.data);
+            } else if (res.page === 'asn_ranges') {
+                renderAsnRanges(res.data);
+            } else if (res.page === 'ip') {
+                renderIpTable(res.data);
+            } else if (res.page === 'no_asn') {
+                renderNoAsnDetails(res.data);
+            } else if (res.page === 'with_asn') {
+                renderWithAsnDetails(res.data);
+            }
+        });
+
+        function renderAsnTable(data) {
+            let html = `<table><tr><th>ASN</th><th>Организация</th><th>Страна</th><th>IP count</th><th>Статус</th><th></th></tr>`;
+            data.forEach(item => {
+                html += `<tr class="clickable-row">
+                        <td onclick="openAsnRanges(${item.id})"><b>AS${item.id}</b></td>
+                        <td onclick="openAsnRanges(${item.id})">${item.name}</td>
+                        <td>${item.country ?? '-'}</td>
+                        <td>${item.ip_count}</td>
+                        <td><span class="badge ${item.blacklisted ? 'bg-black' : 'bg-green'}" onclick="toggleBlacklist(${item.id}, ${item.blacklisted})">${item.blacklisted ? 'Black' : 'Safe'}</span></td>
+                        <td><button class="btn-icon" onclick="deleteAsn(${item.id})">🗑</button></td>
+                    </tr>`;
+            });
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>ASN не найдены.</p>";
+        }
+
+        function openAsnRanges(id) {
+            currentPage = 'asn_ranges';
+            document.getElementById('page-title').innerText = `Диапазоны AS${id}`;
+            renderToolbar();
+            sendMessage('GET_ASN_RANGES', { id: id });
+        }
+
+        function renderAsnRanges(data) {
+            let html = `<table><tr><th>Начало диапазона</th><th>Конец диапазона</th></tr>`;
+            data.forEach(r => html += `<tr><td>${r.start}</td><td>${r.end}</td></tr>`);
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "Диапазоны не найдены (ASN может быть без IPv4 префиксов).";
+        }
+
+        function renderIpTable(data) {
+            let html = `<table><tr><th>Имя файла</th><th>Действия</th></tr>`;
+            data.forEach(item => {
+                html += `<tr>
+                        <td style="cursor:pointer" onclick="openIpList(${item.id}, '${item.name}')"><b>${item.name}</b></td>
+                        <td>
+                            <button class="btn btn-primary" onclick="openIpList(${item.id}, '${item.name}')">Просмотр</button>
+                            <button class="btn-icon" onclick="deleteIpList(${item.id})">🗑</button>
+                        </td>
+                    </tr>`;
+            });
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>Списки пусты.</p>";
+        }
+
+        function renderNoAsnDetails(data) {
+            let html = `<h3>Группировка по B-классу (Первые 2 октета)</h3><table><tr><th>Подсеть</th><th>Кол-во IP</th></tr>`;
+            data.forEach(group => {
+                const safePrefix = group.prefix.replaceAll('.', '-');
+                html += `
+                        <tr class="clickable-row" onclick="toggleGroup('${group.prefix}')">
+                            <td><b>${group.prefix}.x.x</b></td>
+                            <td>${group.count} адресов</td>
+                        </tr>
+                        <tr><td colspan="2" id="group-details-${safePrefix}" style="padding:0"></td></tr>`;
+            });
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>Все IP в этом списке успешно распознаны!</p>";
+        }
+
+        function renderWithAsnDetails(data) {
+            let html = `<h3>Статистика по найденным ASN</h3>
+                            <table><tr><th>ASN</th><th>Название</th><th>Страна</th><th>Кол-во ваших IP</th><th></th></tr>`;
+            data.forEach(item => {
+                html += `
+                        <tr class="clickable-row">
+                            <td onclick="openAsnRanges(${item.asn_id})"><b>AS${item.asn_id}</b></td>
+                            <td>${item.name}</td>
+                            <td>${item.country ?? '??'}</td>
+                            <td><b style="color:#1abc9c">${item.user_ip_count}</b></td>
+                            <td><button class="btn-icon" onclick="deleteAsnFromList(${item.asn_id})">🗑 Отвязать</button></td>
+                        </tr>`;
+            });
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>Ни один IP еще не сопоставлен с ASN.</p>";
+        }
+
+        function toggleGroup(prefix) {
+            const safePrefix = prefix.replaceAll('.', '-');
+            const el = document.getElementById(`group-details-${safePrefix}`);
+            if (el.innerHTML !== "") { el.innerHTML = ""; return; }
+            el.innerHTML = '<p class="loading" style="padding-left:20px">Загрузка адресов...</p>';
+            sendMessage('GET_GROUP_DETAILS', { id: currentListId, value: prefix });
+        }
+
+        function renderGroupIps(prefix, ips) {
+            const safePrefix = prefix.replaceAll('.', '-');
+            const el = document.getElementById(`group-details-${safePrefix}`);
+            if (!el) return;
+            let html = '<div class="group-details"><ul>';
+            ips.forEach(ip => {
+                html += `<li><span>${ip}</span>
+                                <button class="btn btn-danger" onclick="findAsn('${ip}')">Find ASN</button></li>`;
+            });
+            el.innerHTML = html + '</ul><small style="padding-left:10px; color:#999">* Показаны первые 10 IP</small></div>';
+        }
+
+        function openIpList(id, name) {
+            currentListId = id; currentPage = 'details'; activeDetailsTab = 'no_asn';
+            document.getElementById('page-title').innerText = `Файл: ${name}`;
+            switchDetailsTab('no_asn');
+        }
+
+        function deleteAsnFromList(asnId) {
+            if (confirm(`Отвязать AS${asnId} от текущего списка? IP снова станут 'Без ASN'.`)) {
+                sendMessage('UNLINK_ASN_FROM_LIST', { id: currentListId, asn_id: asnId });
+            }
+        }
+
+        function findAsn(ip) { sendMessage('FIND_ASN_BY_IP', { value: ip }); }
+
+        function addAsn() {
+            let val = prompt("Введите номер AS (только цифры):");
+            if (val) sendMessage('ADD_ASN', { value: val.replace(/\D/g, "") });
+        }
+
+        function selectFile() { sendMessage('SELECT_FILE'); }
+        function deleteAsn(id) { if (confirm("Удалить ASN из общего реестра?")) sendMessage('DELETE_ASN', { id: id }); }
+        function deleteIpList(id) { if (confirm("Удалить этот список IP навсегда?")) sendMessage('DELETE_IP_LIST', { id: id }); }
+        function toggleBlacklist(id, status) { sendMessage('TOGGLE_BLACKLIST', { id: id, status: !status }); }
+    </script>
+</body>
+</html>
