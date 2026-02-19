@@ -129,7 +129,7 @@ namespace IPManager
             catch (Exception ex)
             {
                 // Если HE забанил, выбрасываем исключение, чтобы пользователь видел причину
-                throw new Exception($"Не удалось получить данные с bgp.he.net. Возможно, ваш IP временно ограничен. {ex.Message}");
+                throw new Exception($"Unable to retrieve data from bgp.he.net. Your IP may be temporarily restricted. {ex.Message}");
             }
         }
 

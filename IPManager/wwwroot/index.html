@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <title>IP Manager</title>
@@ -186,8 +186,8 @@
 <body>
     <div id="sidebar">
         <h3>IP Manager</h3>
-        <button onclick="changePage('asn')">📡ASN Registry</button>
-        <button onclick="changePage('ip')">📄IP Lists</button>
+        <button onclick="changePage('asn')">📡 ASN Registry</button>
+        <button onclick="changePage('ip')">📄 IP Lists</button>
     </div>
 
     <div id="content">
@@ -212,7 +212,7 @@
         function changePage(page) {
             currentPage = page;
             currentListId = null;
-            document.getElementById('page-title').innerText = page === 'asn' ? 'Autonomous System Registry' : 'Processed IP Lists';
+            document.getElementById('page-title').innerText = page === 'asn' ? 'Autonomous Systems Registry' : 'Processed IP Lists';
             renderToolbar();
             sendMessage('GET_DATA', { page: page });
         }
@@ -223,14 +223,14 @@
             if (currentPage === 'asn') {
                 container.innerHTML = `<button class="btn btn-primary" onclick="addAsn()">+ Add ASN</button>`;
             } else if (currentPage === 'ip') {
-                container.innerHTML = `<button class="btn btn-primary" onclick="selectFile()">+ Upload .TXT file</button>`;
+                container.innerHTML = `<button class="btn btn-primary" onclick="selectFile()">+ Upload .TXT File</button>`;
             } else if (currentPage === 'details') {
                 container.innerHTML = `
-                        <button class="btn btn-tab ${activeDetailsTab === 'no_asn' ? 'active' : ''}" onclick="switchDetailsTab('no_asn')">Without ASN</button>
-                        <button class="btn btn-tab ${activeDetailsTab === 'with_asn' ? 'active' : ''}" onclick="switchDetailsTab('with_asn')">With found ASN</button>
-                        <button class="btn btn-back" onclick="changePage('ip')">← Exit</button>`;
+                            <button class="btn btn-tab ${activeDetailsTab === 'no_asn' ? 'active' : ''}" onclick="switchDetailsTab('no_asn')">Unmapped (No ASN)</button>
+                            <button class="btn btn-tab ${activeDetailsTab === 'with_asn' ? 'active' : ''}" onclick="switchDetailsTab('with_asn')">Mapped (With ASN)</button>
+                            <button class="btn btn-back" onclick="changePage('ip')">← Back</button>`;
             } else if (currentPage === 'asn_ranges') {
-                container.innerHTML = `<button class="btn btn-back" onclick="changePage('asn')">← To the ASN registry</button>`;
+                container.innerHTML = `<button class="btn btn-back" onclick="changePage('asn')">← Back to Registry</button>`;
             }
         }
 
@@ -244,7 +244,7 @@
 
         window.external.receiveMessage(message => {
             const res = JSON.parse(message);
-            if (res.error) { alert("Failure: " + res.error); return; }
+            if (res.error) { alert("Error: " + res.error); return; }
             if (res.message) { console.log("System:", res.message); }
 
             if (res.command === 'RENDER_GROUP_IPS') {
@@ -269,75 +269,76 @@
         });
 
         function renderAsnTable(data) {
-            let html = `<table><tr><th>ASN</th><th>Organisation</th><th>Country</th><th>IP count</th><th>Status</th><th></th></tr>`;
+            let html = `<table><tr><th>ASN</th><th>Organization</th><th>Country</th><th>IP Count</th><th>Status</th><th></th></tr>`;
             data.forEach(item => {
                 html += `<tr class="clickable-row">
-                        <td onclick="openAsnRanges(${item.id})"><b>AS${item.id}</b></td>
-                        <td onclick="openAsnRanges(${item.id})">${item.name}</td>
-                        <td>${item.country ?? '-'}</td>
-                        <td>${item.ip_count}</td>
-                        <td><span class="badge ${item.blacklisted ? 'bg-black' : 'bg-green'}" onclick="toggleBlacklist(${item.id}, ${item.blacklisted})">${item.blacklisted ? 'Black' : 'Safe'}</span></td>
-                        <td><button class="btn-icon" onclick="deleteAsn(${item.id})">🗑</button></td>
-                    </tr>`;
+                            <td onclick="openAsnRanges(${item.id})"><b>AS${item.id}</b></td>
+                            <td onclick="openAsnRanges(${item.id})">${item.name}</td>
+                            <td>${item.country ?? '-'}</td>
+                            <td>${item.ip_count}</td>
+                            <td><span class="badge ${item.blacklisted ? 'bg-black' : 'bg-green'}" onclick="toggleBlacklist(${item.id}, ${item.blacklisted})">${item.blacklisted ? 'Blacklisted' : 'Safe'}</span></td>
+                            <td><button class="btn-icon" title="Delete ASN" onclick="deleteAsn(${item.id})">🗑</button></td>
+                        </tr>`;
             });
-            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>ASN not found.</p>";
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>No ASNs found in registry.</p>";
         }
 
         function openAsnRanges(id) {
             currentPage = 'asn_ranges';
-            document.getElementById('page-title').innerText = `Ranges of AS${id}`;
+            document.getElementById('page-title').innerText = `AS${id} IP Ranges`;
             renderToolbar();
             sendMessage('GET_ASN_RANGES', { id: id });
         }
 
         function renderAsnRanges(data) {
-            let html = `<table><tr><th>Начало диапазона</th><th>End of range</th></tr>`;
+            let html = `<table><tr><th>Range Start</th><th>Range End</th></tr>`;
             data.forEach(r => html += `<tr><td>${r.start}</td><td>${r.end}</td></tr>`);
-            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "Ranges not found (ASN may not have IPv4 prefixes).";
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "No ranges found (this ASN might not have IPv4 prefixes).";
         }
 
         function renderIpTable(data) {
-            let html = `<table><tr><th>File name</th><th>Actions</th></tr>`;
+            let html = `<table><tr><th>File Name</th><th>Created</th><th>Actions</th></tr>`;
             data.forEach(item => {
                 html += `<tr>
-                        <td style="cursor:pointer" onclick="openIpList(${item.id}, '${item.name}')"><b>${item.name}</b></td>
-                        <td>
-                            <button class="btn btn-primary" onclick="openIpList(${item.id}, '${item.name}')">View</button>
-                            <button class="btn-icon" onclick="deleteIpList(${item.id})">🗑</button>
-                        </td>
-                    </tr>`;
+                            <td style="cursor:pointer" onclick="openIpList(${item.id}, '${item.name}')"><b>${item.name}</b></td>
+                            <td>${item.date || '-'}</td>
+                            <td>
+                                <button class="btn btn-primary" onclick="openIpList(${item.id}, '${item.name}')">View Details</button>
+                                <button class="btn-icon" title="Delete List" onclick="deleteIpList(${item.id})">🗑</button>
+                            </td>
+                        </tr>`;
             });
-            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>Lists empty.</p>";
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>No IP lists processed yet.</p>";
         }
 
         function renderNoAsnDetails(data) {
-            let html = `<h3>Grouping by B-class (First 2 octets)</h3><table><tr><th>Subnet</th><th>Number of IPs</th></tr>`;
+            let html = `<h3>Grouped by Class B (First 2 Octets)</h3><table><tr><th>Subnet</th><th>IP Count</th></tr>`;
             data.forEach(group => {
                 const safePrefix = group.prefix.replaceAll('.', '-');
                 html += `
-                        <tr class="clickable-row" onclick="toggleGroup('${group.prefix}')">
-                            <td><b>${group.prefix}.x.x</b></td>
-                            <td>${group.count} addresses</td>
-                        </tr>
-                        <tr><td colspan="2" id="group-details-${safePrefix}" style="padding:0"></td></tr>`;
+                            <tr class="clickable-row" onclick="toggleGroup('${group.prefix}')">
+                                <td><b>${group.prefix}.x.x</b></td>
+                                <td>${group.count} addresses</td>
+                            </tr>
+                            <tr><td colspan="2" id="group-details-${safePrefix}" style="padding:0"></td></tr>`;
             });
-            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>All IPs in this list were successfully recognized!</p>";
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>All IPs in this list have been successfully mapped to an ASN!</p>";
         }
 
         function renderWithAsnDetails(data) {
-            let html = `<h3>Statistics on found ASNs</h3>
-                            <table><tr><th>ASN</th><th>Name</th><th>Country</th><th>Number of IP</th><th></th></tr>`;
+            let html = `<h3>Mapped ASN Statistics</h3>
+                                <table><tr><th>ASN</th><th>Organization</th><th>Country</th><th>Your IPs</th><th></th></tr>`;
             data.forEach(item => {
                 html += `
-                        <tr class="clickable-row">
-                            <td onclick="openAsnRanges(${item.asn_id})"><b>AS${item.asn_id}</b></td>
-                            <td>${item.name}</td>
-                            <td>${item.country ?? '??'}</td>
-                            <td><b style="color:#1abc9c">${item.user_ip_count}</b></td>
-                            <td><button class="btn-icon" onclick="deleteAsnFromList(${item.asn_id})">🗑 Remove</button></td>
-                        </tr>`;
+                            <tr class="clickable-row">
+                                <td onclick="openAsnRanges(${item.asn_id})"><b>AS${item.asn_id}</b></td>
+                                <td>${item.name}</td>
+                                <td>${item.country ?? '??'}</td>
+                                <td><b style="color:#1abc9c">${item.count}</b></td>
+                                <td><button class="btn-icon" onclick="deleteAsnFromList(${item.asn_id})">🗑 Unlink</button></td>
+                            </tr>`;
             });
-            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>No IP has been mapped to an ASN yet.</p>";
+            document.getElementById('table-container').innerHTML = data.length ? html + `</table>` : "<p>No IPs from this list have been mapped to an ASN yet.</p>";
         }
 
         function toggleGroup(prefix) {
@@ -355,9 +356,9 @@
             let html = '<div class="group-details"><ul>';
             ips.forEach(ip => {
                 html += `<li><span>${ip}</span>
-                                <button class="btn btn-danger" onclick="findAsn('${ip}')">Find ASN</button></li>`;
+                                    <button class="btn btn-danger" onclick="findAsn('${ip}')">Lookup ASN</button></li>`;
             });
-            el.innerHTML = html + '</ul><small style="padding-left:10px; color:#999">* Showing the first 10 IPs</small></div>';
+            el.innerHTML = html + '</ul><small style="padding-left:10px; color:#999">* Showing first 10 IPs</small></div>';
         }
 
         function openIpList(id, name) {
@@ -367,7 +368,7 @@
         }
 
         function deleteAsnFromList(asnId) {
-            if (confirm(`Unlink AS${asnId} from the current list? IPs will become 'No ASN' again'.`)) {
+            if (confirm(`Unlink AS${asnId} from this list? IPs will return to 'Unmapped' status.`)) {
                 sendMessage('UNLINK_ASN_FROM_LIST', { id: currentListId, asn_id: asnId });
             }
         }
@@ -375,12 +376,12 @@
         function findAsn(ip) { sendMessage('FIND_ASN_BY_IP', { value: ip }); }
 
         function addAsn() {
-            let val = prompt("Enter AS number (numbers only):");
+            let val = prompt("Enter AS Number (digits only):");
             if (val) sendMessage('ADD_ASN', { value: val.replace(/\D/g, "") });
         }
 
         function selectFile() { sendMessage('SELECT_FILE'); }
-        function deleteAsn(id) { if (confirm("Delete ASN from the general registry?")) sendMessage('DELETE_ASN', { id: id }); }
+        function deleteAsn(id) { if (confirm("Remove this ASN from the registry?")) sendMessage('DELETE_ASN', { id: id }); }
         function deleteIpList(id) { if (confirm("Delete this IP list permanently?")) sendMessage('DELETE_IP_LIST', { id: id }); }
         function toggleBlacklist(id, status) { sendMessage('TOGGLE_BLACKLIST', { id: id, status: !status }); }
     </script>
