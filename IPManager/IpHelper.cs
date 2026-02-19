@@ -24,25 +24,28 @@ namespace IPManager
 
         }
 
-
-
         public static (uint start, uint end) ParseCIDR(string cidr)
         {
+            if (string.IsNullOrWhiteSpace(cidr))
+                throw new ArgumentException("CIDR cannot be empty");
 
             string[] parts = cidr.Split('/');
 
+            // ПРОВЕРКА: Если нет '/' или формат неверный
+            if (parts.Length != 2)
+                throw new FormatException("Invalid CIDR format. Expected IP/Prefix (e.g., 192.168.1.0/24)");
+
             uint ip = ToUint(parts[0]);
 
-            int maskLength = int.Parse(parts[1]);
+            // ПРОВЕРКА: Является ли маска числом и входит ли в диапазон 0-32
+            if (!int.TryParse(parts[1], out int maskLength) || maskLength < 0 || maskLength > 32)
+                throw new ArgumentOutOfRangeException(nameof(cidr), "Mask length must be between 0 and 32");
 
             uint mask = maskLength == 0 ? 0 : 0xffffffff << (32 - maskLength);
-
             uint start = ip & mask;
-
             uint end = start | ~mask;
 
             return (start, end);
-
         }
 
     }
