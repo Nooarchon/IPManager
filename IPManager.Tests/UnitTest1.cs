@@ -26,8 +26,16 @@ namespace IPManager.Tests
         {
             var dbMock = new Mock<DatabaseService>();
             var payload = new Program.Payload { command = "ADD_ASN", value = invalidAsn };
+
             Program.ExecuteCommand(null, dbMock.Object, payload);
-            dbMock.Verify(db => db.SaveAsn(It.IsAny<int>(), It.IsAny<string>(), It.IsAny<string>(), It.IsAny<List<(uint, uint)>>()), Times.Never);
+
+            // Используем It.IsAny для всего списка, не уточняя типы внутри кортежа, если Moq капризничает
+            dbMock.Verify(db => db.SaveAsn(
+                It.IsAny<int>(),
+                It.IsAny<string>(),
+                It.IsAny<string>(),
+                It.IsAny<List<(uint, uint)>>()),
+                Times.Never);
         }
 
         [Fact]

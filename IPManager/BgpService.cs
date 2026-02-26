@@ -109,27 +109,32 @@ namespace IPManager
             var result = new List<(uint start, uint end)>();
             try
             {
-                // Загружаем основную страницу префиксов, которую вы скинули
+                // Используем CancellationTokenSource для контроля зависаний
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 string url = $"https://bgp.he.net/AS{asnId}#_prefixes";
-                var response = await _httpClient.GetStringAsync(url);
 
-                // Используем регулярное выражение для поиска IPv4 CIDR в таблице
-                // Ищем строки вида /net/1.2.3.0/24
-                var matches = Regex.Matches(response, @"/net/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}/\d{1,2})");
+                var response = await _httpClient.GetStringAsync(url, cts.Token);
+
+                // Уточненное регулярное выражение: ищем именно паттерн сети в ссылках
+                // Пример: <a href="/net/1.2.3.0/24">1.2.3.0/24</a>
+                var matches = Regex.Matches(response, @"/net/(\d{1,3}(\.\d{1,3}){3}/\d{1,2})");
 
                 foreach (Match match in matches)
                 {
                     string cidr = match.Groups[1].Value;
+                    // Метод ParseCidr у вас уже реализован корректно
                     result.Add(ParseCidr(cidr));
                 }
 
-                // Удаляем дубликаты, если они есть
                 return result.Distinct().ToList();
+            }
+            catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.Forbidden)
+            {
+                throw new Exception("BGP.HE.NET denied access (403). Try again later or use a VPN.");
             }
             catch (Exception ex)
             {
-                // Если HE забанил, выбрасываем исключение, чтобы пользователь видел причину
-                throw new Exception($"Unable to retrieve data from bgp.he.net. Your IP may be temporarily restricted. {ex.Message}");
+                throw new Exception($"BGP Error: {ex.Message}");
             }
         }
 

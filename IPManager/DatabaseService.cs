@@ -40,7 +40,6 @@ namespace IPManager
                     FOREIGN KEY (asn_id) REFERENCES asn(asn_id) ON DELETE CASCADE
                 );
 
-                -- Индекс для быстрого поиска IP в диапазонах
                 CREATE INDEX IF NOT EXISTS idx_range_lookup ON asn_ip_range (range_start, range_end);
 
                 CREATE TABLE IF NOT EXISTS ip_list (
@@ -58,12 +57,11 @@ namespace IPManager
                     FOREIGN KEY (asn_id) REFERENCES asn(asn_id) ON DELETE SET NULL
                 );
                 
-                -- Индекс для ускорения группировки и поиска по asn_id
                 CREATE INDEX IF NOT EXISTS idx_ip_row_asn ON ip_list_row (asn_id);";
             cmd.ExecuteNonQuery();
         }
 
-        // --- Логика привязки и отвязки ---
+        // --- ЛОГИКА ПРИВЯЗКИ (Используется в Program.cs) ---
 
         public virtual void RebindIpsToAsn(int asnId)
         {
@@ -95,7 +93,7 @@ namespace IPManager
             catch { tx.Rollback(); throw; }
         }
 
-        public void UnlinkAsnFromList(int iplistId, int asnId)
+        public virtual void UnlinkAsnFromList(int iplistId, int asnId)
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
@@ -106,80 +104,59 @@ namespace IPManager
             cmd.ExecuteNonQuery();
         }
 
-        // --- Работа с ASN ---
+        // --- РАБОТА С ASN ---
 
         public virtual void SaveAsn(int id, string name, string country, List<(uint start, uint end)> ranges)
         {
+            if (id <= 0)
+                throw new ArgumentException("ASN must be a positive number.");
+
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
-
-            // ПРОВЕРКА: Как на самом деле называется колонка?
-            string idColumn = "asn_id"; // по умолчанию
-            try
-            {
-                var checkCmd = connection.CreateCommand();
-                checkCmd.CommandText = "SELECT id FROM asn LIMIT 1";
-                checkCmd.ExecuteReader();
-                idColumn = "id";
-            }
-            catch
-            {
-                // Если упало, значит колонки 'id' нет, оставляем 'asn_id'
-            }
 
             using var transaction = connection.BeginTransaction();
             try
             {
-                // 1. Сохранение ASN
                 var cmd = connection.CreateCommand();
-                // Используем найденное имя колонки динамически
-                cmd.CommandText = $@"
-            INSERT INTO asn ({idColumn}, name, country_id) 
-            VALUES (@id, @name, @country)
-            ON CONFLICT({idColumn}) DO UPDATE SET 
-                name = excluded.name, 
-                country_id = excluded.country_id";
+                cmd.CommandText = @"
+                    INSERT INTO asn (asn_id, name, country_id) 
+                    VALUES (@id, @name, @country)
+                    ON CONFLICT(asn_id) DO UPDATE SET 
+                        name = excluded.name, 
+                        country_id = excluded.country_id";
 
                 cmd.Parameters.AddWithValue("@id", id);
                 cmd.Parameters.AddWithValue("@name", name ?? "");
                 cmd.Parameters.AddWithValue("@country", country ?? "??");
                 cmd.ExecuteNonQuery();
 
-                // 2. Удаление старых диапазонов
                 var delCmd = connection.CreateCommand();
-                delCmd.CommandText = $"DELETE FROM asn_ip_range WHERE asn_id = @id";
+                delCmd.CommandText = "DELETE FROM asn_ip_range WHERE asn_id = @id";
                 delCmd.Parameters.AddWithValue("@id", id);
                 delCmd.ExecuteNonQuery();
 
-                // 3. Вставка диапазонов (те самые числа из HE.net)
-                // Используем транзакцию и один объект команды для скорости
-                // 3. Вставка диапазонов (числа из HE.net)
                 var rangeCmd = connection.CreateCommand();
-                // ДОБАВЛЯЕМ "OR IGNORE" - если такое начало диапазона уже есть, SQL просто пропустит его без ошибки
                 rangeCmd.CommandText = "INSERT OR IGNORE INTO asn_ip_range (asn_id, range_start, range_end) VALUES (@id, @start, @end)";
-
                 var pStart = rangeCmd.Parameters.Add("@start", SqliteType.Integer);
                 var pEnd = rangeCmd.Parameters.Add("@end", SqliteType.Integer);
                 rangeCmd.Parameters.AddWithValue("@id", id);
 
-                var seenRanges = new HashSet<(uint, uint)>();
                 foreach (var range in ranges)
                 {
-                    if (!seenRanges.Add(range)) continue;
-
-                    pStart.Value = range.start;
-                    pEnd.Value = range.end;
+                    pStart.Value = (long)range.start;
+                    pEnd.Value = (long)range.end;
                     rangeCmd.ExecuteNonQuery();
                 }
 
                 transaction.Commit();
             }
-            catch (Exception ex)
+            catch
             {
                 transaction.Rollback();
-                throw new Exception($"Ошибка БД (Колонка: {idColumn}): {ex.Message}");
+                throw;
             }
         }
+
         public virtual List<object> GetAsnList()
         {
             var result = new List<object>();
@@ -206,7 +183,7 @@ namespace IPManager
             return result;
         }
 
-        // --- Импорт и просмотр списков ---
+        // --- ИМПОРТ И ПРОСМОТР СПИСКОВ ---
 
         public virtual void ImportIpList(string fileName, List<uint> ips)
         {
@@ -228,7 +205,6 @@ namespace IPManager
                     ins.ExecuteNonQuery();
                 }
 
-                // Массовое обновление привязок (Оптимизировано через подзапрос)
                 var updateSql = @"
                     UPDATE ip_list_row 
                     SET asn_id = (
@@ -252,7 +228,6 @@ namespace IPManager
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
 
-            // Используем деление для получения префикса, это надежнее для SQL
             var sql = @"
                 SELECT (ip / 65536) as prefix_val, COUNT(*) 
                 FROM ip_list_row 
@@ -265,9 +240,7 @@ namespace IPManager
             while (reader.Read())
             {
                 long pVal = reader.GetInt64(0);
-                // Преобразуем число обратно в формат x.x.0.0
                 string prefixStr = $"{(pVal >> 8) & 0xFF}.{pVal & 0xFF}.x.x";
-
                 result.Add(new { prefix = prefixStr, count = reader.GetInt32(1) });
             }
             return result;
@@ -313,16 +286,7 @@ namespace IPManager
             return result;
         }
 
-        // --- Вспомогательные методы ---
-
-        private string UintToIp(uint ip)
-        {
-            byte[] bytes = BitConverter.GetBytes(ip);
-            if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
-            return new System.Net.IPAddress(bytes).ToString();
-        }
-
-        public bool AsnExists(int asnId)
+        public virtual bool AsnExists(int asnId)
         {
             using var connection = new SqliteConnection(_connectionString);
             connection.Open();
@@ -373,7 +337,7 @@ namespace IPManager
             cmd.ExecuteNonQuery();
         }
 
-        public object GetAsnRanges(int asnId)
+        public virtual object GetAsnRanges(int asnId)
         {
             var list = new List<object>();
             using var conn = new SqliteConnection(_connectionString);
@@ -390,6 +354,13 @@ namespace IPManager
                 });
             }
             return list;
+        }
+
+        private string UintToIp(uint ip)
+        {
+            byte[] bytes = BitConverter.GetBytes(ip);
+            if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
+            return new System.Net.IPAddress(bytes).ToString();
         }
     }
 }
