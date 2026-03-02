@@ -61,7 +61,7 @@ namespace IPManager
             cmd.ExecuteNonQuery();
         }
 
-        // --- ЛОГИКА ПРИВЯЗКИ (Используется в Program.cs) ---
+        // --- CONNECTION (USED IN Program.cs) ---
 
         public virtual void RebindIpsToAsn(int asnId)
         {
@@ -104,7 +104,7 @@ namespace IPManager
             cmd.ExecuteNonQuery();
         }
 
-        // --- РАБОТА С ASN ---
+        // --- WORK WITH  ASN ---
 
         public virtual void SaveAsn(int id, string name, string country, List<(uint start, uint end)> ranges)
         {
@@ -183,7 +183,7 @@ namespace IPManager
             return result;
         }
 
-        // --- ИМПОРТ И ПРОСМОТР СПИСКОВ ---
+        // --- IMPORT AND VIEW LISTS ---
 
         public virtual void ImportIpList(string fileName, List<uint> ips)
         {

@@ -6,7 +6,7 @@ using System.Linq;
 
 namespace IPManager.Tests
 {
-    // Ваши существующие тесты команд (Unit Tests)
+    // Your existing Unit Tests
     public class UnitTest1
     {
         [Fact]
@@ -29,7 +29,7 @@ namespace IPManager.Tests
 
             Program.ExecuteCommand(null, dbMock.Object, payload);
 
-            // Используем It.IsAny для всего списка, не уточняя типы внутри кортежа, если Moq капризничает
+            // Use It.IsAny for the entire list, without specifying types within the tuple if Moq is being picky
             dbMock.Verify(db => db.SaveAsn(
                 It.IsAny<int>(),
                 It.IsAny<string>(),
@@ -48,39 +48,39 @@ namespace IPManager.Tests
         }
     }
 
-    // НОВЫЙ КЛАСС: Тесты логики привязки IP (Integration Tests)
+    // NEW CLASS: IP Binding Logic Tests (Integration Tests)
     public class IPBindingTests
     {
         [Fact]
         public void ImportIpList_ShouldAssignCorrectAsn_WhenIpIsInRange()
         {
-            // 1. Arrange: Создаем реальную службу БД (она создаст файл ip_manager.db в папке тестов)
+            // 1. Arrange: Create a real DB service (it will create the ip_manager.db file in the tests folder)
             var db = new DatabaseService();
 
             int testAsnId = 136907;
-            // Диапазон 203.0.113.0 - 203.0.113.255 (в числах 3405902080 - 3405902335)
+            // Range 203.0.113.0 - 203.0.113.255 (in numbers 3405902080 - 3405902335)
             var ranges = new List<(uint start, uint end)> { (3405902080, 3405902335) };
 
             db.SaveAsn(testAsnId, "Test Net", "US", ranges);
 
-            // IP: 203.0.113.50 (число 3405902130)
+            // IP: 203.0.113.50 (number 3405902130)
             var importedIps = new List<uint> { 3405902130 };
 
-            // 2. Act: Загружаем IP
+            // 2. Act: Load IP
             db.ImportIpList("integration_test.txt", importedIps);
 
-            // 3. Assert: Проверяем, что в списке "IP с ASN" появился наш адрес
+            // 3. Assert: We check that our address appears in the "IP with ASN" list
             var results = db.GetIpsWithAsn(GetLastListId(db));
 
             Assert.Contains(results, (dynamic r) => r.asn == testAsnId);
         }
 
-        // Вспомогательный метод, чтобы найти ID последнего загруженного списка
+        // Helper method to find the ID of the last loaded list
         private int GetLastListId(DatabaseService db)
         {
             var lists = db.GetIpLists();
             if (lists.Count == 0) return 0;
-            // Берем ID самого первого (верхнего) списка
+            // Take the ID of the very first (top) list
             return (int)((dynamic)lists[0]).id;
         }
     }

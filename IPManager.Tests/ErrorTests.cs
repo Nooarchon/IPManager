@@ -12,22 +12,22 @@ namespace IPManager.Tests
     public class ErrorTests
     {
         [Theory]
-        [InlineData("not-an-ip")]       // Вообще не IP
-        [InlineData("256.0.0.1")]       // Некорректное число
-        [InlineData(null)]              // Null
+        [InlineData("not-an-ip")] // Not an IP at all
+        [InlineData("256.0.0.1")] // Invalid number
+        [InlineData(null)] // Null
         public void ToUint_InvalidIp_ThrowsException(string invalidIp)
         {
-            // Проверяем, что метод выбрасывает ошибку при плохом IP
+            // Check that the method throws an error if the IP is invalid
             Assert.ThrowsAny<Exception>(() => IpHelper.ToUint(invalidIp));
         }
 
         [Theory]
-        [InlineData("192.168.1.0/abc")] // Маска буквами
-        [InlineData("192.168.1.0/33")]  // Маска слишком большая
-        [InlineData("192.168.1.0")]     // Нет слеша и маски
+        [InlineData("192.168.1.0/abc")] // Alphabetical mask
+        [InlineData("192.168.1.0/33")] // Mask is too large
+        [InlineData("192.168.1.0")] // Missing slash and mask
         public void ParseCIDR_InvalidFormat_ThrowsException(string invalidCidr)
         {
-            // Проверяем, что при неверном CIDR метод падает
+            // Check that the method fails with an invalid CIDR
             Assert.ThrowsAny<Exception>(() => IpHelper.ParseCIDR(invalidCidr));
         }
     }

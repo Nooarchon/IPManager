@@ -13,9 +13,9 @@ namespace IPManager.Tests
         [Fact]
         public void ToUint_ValidIp_ReturnsCorrectLongValue()
         {
-            // Проверяем, что 192.168.0.1 конвертируется правильно
+            // Check that 192.168.0.1 is converted correctly
             string ip = "192.168.0.1";
-            uint expected = 0xC0A80001; // Это 192.168.0.1 в шестнадцатеричном виде
+            uint expected = 0xC0A80001; // This is 192.168.0.1 in hexadecimal
 
             uint result = IpHelper.ToUint(ip);
 
@@ -25,12 +25,12 @@ namespace IPManager.Tests
         [Fact]
         public void ParseCIDR_ValidNetwork_ReturnsCorrectRange()
         {
-            // Проверяем сеть 192.168.1.0/24 (маска 255.255.255.0)
+            // Checking the network 192.168.1.0/24 (mask 255.255.255.0)
             string cidr = "192.168.1.0/24";
 
             var (start, end) = IpHelper.ParseCIDR(cidr);
 
-            // Начало: 192.168.1.0, Конец: 192.168.1.255
+            // Start: 192.168.1.0, End: 192.168.1.255
             Assert.Equal(IpHelper.ToUint("192.168.1.0"), start);
             Assert.Equal(IpHelper.ToUint("192.168.1.255"), end);
         }
