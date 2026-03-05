@@ -17,11 +17,11 @@ namespace IPManager
 
         public BgpService()
         {
-            // Используем SocketsHttpHandler для поддержки современных протоколов
+            // Use SocketsHttpHandler to support modern protocols
             var handler = new HttpClientHandler { AllowAutoRedirect = true };
             _httpClient = new HttpClient(handler);
 
-            // Имитируем реальный браузер максимально подробно
+            // Simulate a real browser as accurately as possible
             _httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36");
             _httpClient.DefaultRequestHeaders.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8");
             _httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
@@ -80,10 +80,10 @@ namespace IPManager
 
         public async Task<(string name, string country, List<(uint start, uint end)> ranges)> GetAsnFullInfo(int asnId)
         {
-            // 1. Пытаемся получить префиксы через парсинг HTML (самый надежный способ для HE.net)
+            // 1. Try to get prefixes by parsing HTML (the most reliable method for HE.net)
             var ranges = await GetPrefixesFromHeHtml(asnId);
 
-            // 2. Имя и страна через ARIN
+            // 2. Name and country via ARIN
             string name = $"AS{asnId}";
             string country = "??";
             try
@@ -109,20 +109,20 @@ namespace IPManager
             var result = new List<(uint start, uint end)>();
             try
             {
-                // Используем CancellationTokenSource для контроля зависаний
+                // Using CancellationTokenSource to detect hangs
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
                 string url = $"https://bgp.he.net/AS{asnId}#_prefixes";
 
                 var response = await _httpClient.GetStringAsync(url, cts.Token);
 
-                // Уточненное регулярное выражение: ищем именно паттерн сети в ссылках
-                // Пример: <a href="/net/1.2.3.0/24">1.2.3.0/24</a>
+                // Refined regular expression: looking for the network pattern in links
+                // Example: <a href="/net/1.2.3.0/24">1.2.3.0/24</a>
                 var matches = Regex.Matches(response, @"/net/(\d{1,3}(\.\d{1,3}){3}/\d{1,2})");
 
                 foreach (Match match in matches)
                 {
                     string cidr = match.Groups[1].Value;
-                    // Метод ParseCidr у вас уже реализован корректно
+                    // Your ParseCidr method is already implemented correctly
                     result.Add(ParseCidr(cidr));
                 }
 

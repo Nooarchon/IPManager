@@ -1,19 +1,13 @@
 ﻿using System.Net;
 
-
-
 namespace IPManager
 
 {
-
     // Helper class for working with IP
-
     public static class IpHelper
     {
-
         public static uint ToUint(string ipAddress)
         {
-
             var address = System.Net.IPAddress.Parse(ipAddress);
 
             byte[] bytes = address.GetAddressBytes();
@@ -21,9 +15,7 @@ namespace IPManager
             if (BitConverter.IsLittleEndian) Array.Reverse(bytes);
 
             return BitConverter.ToUInt32(bytes, 0);
-
         }
-
         public static (uint start, uint end) ParseCIDR(string cidr)
         {
             if (string.IsNullOrWhiteSpace(cidr))

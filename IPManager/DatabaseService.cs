@@ -6,15 +6,13 @@ using System.Linq;
 
 namespace IPManager
 {
-    public class DatabaseService
+   public class DatabaseService
     {
         private readonly string _connectionString = "Data Source=ip_manager.db";
-
         public DatabaseService()
         {
             InitializeDatabase();
         }
-
         private void InitializeDatabase()
         {
             using var connection = new SqliteConnection(_connectionString);
